@@ -1,0 +1,265 @@
+#reference used for movement formulas: 
+#http://www.cs.unc.edu/~jasleen/Courses/Fall11/HW/HW4-functions-chessboard-simplified.pdf
+.data
+
+move:
+#.asciiz "Kd5f6" 	#invalid King Move
+
+#.asciiz "Kd5e6"	#valid King Move
+
+#.asciiz "Xa2a3"	#valid Pawn bot-to-top move
+
+#.asciiz "Xa2a4"	#should be valid but not working
+
+#.asciiz "Ya7b6"	#valid Pawn top-to-bot move
+
+#.asciiz "Bb3f7"	#valid Bishop Move
+
+#.asciiz "Bb3c3"	#invalid Bishop Move
+
+#.asciiz "Qa1a7"	#valid Queen move (rook)
+
+#.asciiz "Qb3c3"    #valid Queen move (bishop)
+
+#.asciiz "Ra1a7"	#valid Rook move
+
+#.asciiz "Ra1b2"	#invalid Rook move
+
+#.asciiz "Nb1a3"	#Couldn't figure out Knight movement
+
+validMove:
+.asciiz "0"
+
+invalidMove:
+.asciiz "1"
+
+invalidInput:
+.asciiz "Invalid Input!"
+
+.text
+.globl main
+
+main:
+#K, Q, R, B, N, X (bottom to top), Y (top to bottom)
+#'a' to 'h' 
+#1 to 8
+la x1, move					#x1 now points to first character of move i.e X
+
+addi x3, x0, 0x4B			#x3 = K
+addi x4, x0, 0x51			#x4 = Q
+addi x5, x0, 0x52			#x5 = R
+addi x6, x0, 0x42			#x6 = B
+addi x7, x0, 0x4E			#x7 = N
+addi x8, x0, 0x58			#x8 = X
+addi x9, x0, 0x59			#x9 = Y
+
+addi x18, x0, 0x61			#x18 = a
+addi x19, x0, 0x68			#x19 = h
+
+addi x20, x0, 0x31			#x20 = 1
+addi x21, x0, 0x38			#x21 = 8
+
+checkPiece:
+lb x2, 0(x1)			#x2 now points to first character with offset of 0
+
+add x10, x0, x2			#x10 = input piece for checkMove
+
+beq x2, x3, checkCol		#if x2 = K, then check column
+beq x2, x4, checkCol		#if x2 = Q, then check column
+beq x2, x5, checkCol		#if x2 = R, then check column
+beq x2, x6, checkCol		#if x2 = B, then check column
+beq x2, x7, checkCol		#if x2 = N, then check column
+beq x2, x8, checkCol		#if x2 = X, then check column
+beq x2, x9, checkCol		#if x2 = Y, then check column
+beq x0, x0, invalid			#not equal to any, so invalid input
+
+
+checkCol:
+
+addi x1, x1, 1						#move to srcCol input
+lb x2, 0(x1)
+add x11, x0, x2						#x11 = srcCol
+
+blt x2, x18, invalid 				#if x2 < ascii a, invalid
+bgt x2, x19, invalid				#if x2 > ascii h, invalid
+
+addi x1, x1, 2 						#move to dstCol input and do the same check
+lb x2, 0(x1)
+add x13, x0, x2						#x13 = dstCol
+
+blt x2, x18, invalid 				#if x2 < ascii a, invalid
+bgt x2, x19, invalid				#if x2 > ascii h, invalid
+
+beq x0, x0, checkRow				#otherwise, both colinputs are valid, so we check row now
+
+checkRow:
+
+addi x1, x1, -1						#take it back to point to srcRow input
+lb x2, 0(x1)
+add x12, x0, x2						#x12 = srcRow 
+
+blt x2, x20, invalid				#if x2 < ascii 1, invalid input
+bgt x2, x21, invalid				#if x2 > ascii 8, invalid input
+
+addi x1, x1, 2						#move to dstRow input and do same check
+lb x2, 0(x1)
+add x14, x0, x2						#x14 = dstRow
+
+blt x2, x20, invalid				#if x2 < ascii 1, invalid input
+bgt x2, x21, invalid				#if x2 > ascii 8, invalid input
+
+addi x1, x1, 1						# increment again
+lb x2, 0(x1)
+
+bne x2, x0, invalid							#here we're checking if the string is null terminated in which case we move						
+jal checkMove								# to checkMove. If the string has a longer length than specified, this also
+											# outputs the input as invalid
+
+invalid:
+
+addi a0, x0, 4
+la a1, invalidInput
+ecall
+
+addi a0, x0, 10
+ecall
+
+checkMove:
+
+beq x10, x5, rook
+beq x10, x8, pawn
+beq x10, x3, king
+beq x10, x6, bishop
+beq x10, x4, queen
+beq x10, x7, knight
+
+knight:
+#(X1, Y1) to (X2, Y2) valid iff (|X2 ‐ X1| = 1 and |Y2 ‐ Y1| = 2) or ((|X2 ‐ X1| = 2 and |Y2 ‐ Y1| = 1) .
+neg x22, x11
+neg x23, x12
+
+addi x24, x0, 1		#x24 = 1
+addi x25, x0, 2		#x25 = 2
+
+sub x26, x13, x22	#x26 = |X2 - X1|
+sub x27, x14, x23	#x27 = |Y2 - Y1|
+
+beq x26, x24, Knight1		#x26 = 1
+beq x26, x25, Knight2		#x26 = 2
+
+Knight1:
+
+beq x27, x25, validMoveOut		#x27 = 2
+beq x0, x0, invalidMoveOut
+
+Knight2:
+
+beq x27, x24, validMoveOut		#x27 = 1
+beq x0, x0, invalidMoveOut
+
+queen:
+neg x24, x11	
+neg x25, x12
+add x22, x13, x24 				#x22 = |X2 - X1|
+add x23, x14, x25				#x23 = |Y2 - Y1|
+beq x22, x23, validMoveOut		#|X2 - X1| = |Y2 - Y1|
+
+beq x11, x13, validMoveOut
+beq x12, x14, validMoveOut
+beq x0, x0, invalidMoveOut
+
+
+bishop:
+#Move from (X1, Y1) to (X2, Y2) valid iff |X2 ‐ X1| =|Y2 ‐ Y1|
+neg x24, x11	
+neg x25, x12
+add x22, x13, x24 				#x22 = |X2 - X1|
+add x23, x14, x25				#x23 = |Y2 - Y1|
+beq x22, x23, validMoveOut		#|X2 - X1| = |Y2 - Y1|
+beq x0, x0, invalidMoveOut
+
+king:
+#From (x1, x2) to (y1, y2) valid iff |X2-X1| <= 1 and |Y2-Y1| <= 1
+neg x11, x11
+add x22, x13, x11		#|dstCol - srcCol|
+
+neg x12, x12
+add x24, x14, x12		#|dstRow - srcRow|
+
+addi x23, x0, 1
+bgt x22, x23, invalidMoveOut	#if x22 > 1, i.e |X2 - X1| > 1, invalid
+
+bgt x24, x23, invalidMoveOut	#if x24 > 1, i.e |Y2 - Y1| > 1, invalid
+
+beq x0, x0, validMoveOut		#else valid i.e <= 1 in both cases
+
+rook:
+
+# (x1, y1) to (x2, y2) valid iff x1(srcCol) = x2(dstCol) or y1(srcRow) = y2(dstRow)
+beq x11, x13, validMoveOut
+beq x12, x14, validMoveOut
+beq x0, x0, invalidMoveOut
+
+pawn:
+
+bgt x14, x12, bot_to_top		#if dstRow > srcRow, we're moving from bottom to top
+blt x14, x12, top_to_bot		#if dstRow < srcRow, we're moving from top to bottom
+bot_to_top:
+
+addi x22, x0, 2					#x22 = 2
+bne x11, x13, invalidMoveOut	#if srcCol != dstCol, invalidMove
+beq x12, x22, initialPositionbot	#if srcRow = 2, pawn is at initial position and can move either 1 or 2 squares
+beq x0, x0, notInitialPositionbot
+
+initialPositionbot:
+#I couldn't figure out why this wasn't working
+sub x23, x14, x12					#x23 = dstRow - srcRow which should be 1 or 2 is the move is valid
+addi x24, x0, 1						#x24 = 1
+beq x23, x22, validMoveOut			# = 2 so valid
+beq x23, x24, validMoveOut			# = 1 so valid
+beq x0, x0, invalidMoveOut			#if neither 1 or 2 this branch is excuted and it's invalid
+
+notInitialPositionbot:
+
+#If pawn not at initial position, then it can only move 1 square
+sub x23, x14, x12				#x23 = dstRow - srcRow which should be equal to 1 only
+addi x24, x0, 1					#x24 = 1
+beq x24, x23, validMoveOut
+beq x0, x0, invalidMoveOut
+
+top_to_bot:
+addi x22, x0, 7						#x22 = 7
+bne x11, x13, invalidMoveOut		#if srcCol != dstCol, invalidMove
+beq x12, x22, initialPositionTop	#if srcRow = 7, pawn is at initial position and can move either 1 or 2 squares
+beq x0, x0, notInitialPositionTop
+
+initialPositionTop:
+#Same as initialPositionBottom, I couldn't figure out why this wasn't working
+
+sub x23, x12, x14					#x23 = SrcRow - DstRow which should be 1 or 2 is the move is valid
+addi x24, x0, 1						#x24 = 1
+addi x22, x0, 2
+beq x23, x22, validMoveOut			# = 2 so valid
+beq x23, x24, validMoveOut			# = 1 so valid
+beq x0, x0, invalidMoveOut			#if neither 1 or 2 this branch is excuted and it's invalid
+
+notInitialPositionTop:
+sub x23, x12, x14					#x23 = SrcRow - DstRow which should be 1 if the move is valid
+addi x24, x0, 1
+beq x23, x24, validMoveOut
+beq x0, x0, invalidMoveOut
+
+invalidMoveOut:
+addi a0, x0, 4
+la a1, invalidMove
+ecall
+addi a0, x0, 10
+ecall
+
+validMoveOut:
+addi a0, x0, 4
+la a1, validMove
+ecall
+addi a0, x0, 10
+ecall
+
